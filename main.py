@@ -5,7 +5,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Boolean
 
-
 app = Flask(__name__)
 
 
@@ -34,6 +33,9 @@ class Cafe(db.Model):
     can_take_calls: Mapped[bool] = mapped_column(Boolean, nullable=False)
     coffee_price: Mapped[str] = mapped_column(String(250), nullable=True)
 
+    def to_dict(self):
+        return {column.name: getattr(self, column.name) for column in self.__table__.columns}
+
 
 with app.app_context():
     db.create_all()
@@ -45,6 +47,9 @@ def home():
 
 
 # HTTP GET - Read Record
+'''read_record(): search for random cafe'''
+
+
 @app.route("/random", methods=["GET"])
 def read_record():
     result = db.session.execute(db.select(Cafe))
@@ -65,7 +70,10 @@ def read_record():
     })
 
 
-@app.route("/all", method=["GET"])
+'''get_all(): get all the cafes information'''
+
+
+@app.route("/all", methods=["GET"])
 def get_all():
     result = db.session.execute(db.select(Cafe))
     all_cafes = result.scalars().all()
@@ -75,9 +83,13 @@ def get_all():
     return jsonify(cafes=list_cafes)
 
 
-@app.route("/search", method=["GET"])
-def search_loc(loc):
-    result = db.session.execute(db.select(Cafe).where(Cafe.location == loc))
+'''search_loc(): search for the specific cafe's location '''
+
+
+@app.route("/search")
+def search_loc():
+    q = request.args.get("loc")
+    result = db.session.execute(db.select(Cafe).where(Cafe.location == q))
     all_cafes = result.scalars().all()
     if all_cafes:
         return jsonify(cafes=[cafe.to_dict() for cafe in all_cafes])
@@ -86,7 +98,37 @@ def search_loc(loc):
 
 
 # HTTP POST - Create Record
-# HTTP PUT/PATCH - Update Record
+@app.route("/add", methods=["POST"])
+def create_cafe():
+    new_cafe = Cafe(
+        name=request.form.get("name"),
+        map_url=request.form.get("map_url"),
+        img_url=request.form.get("img_url"),
+        location=request.form.get("location"),
+        has_sockets=request.form.get("has_sockets"),
+        has_toilet=request.form.get("has_toilet"),
+        has_wifi=request.form.get("has_wifi"),
+        can_take_calls=request.form.get("can_take_call"),
+        seats=request.form.get("seats"),
+        coffee_price=request.form.get("coffee_price")
+    )
+    db.session.add(new_cafe)
+    db.session.commit()
+    return jsonify(respone={"success": "Successfully added the new cafe."})
+
+
+# HTTP PUT(update entire data to replace previous one)/PATCH(update piece of data) - Update Record
+@app.route("/update-price/<int:cafe_id>", methods=["PATCH"])
+def update_cafe_id(cafe_id):
+    q = request.args.get("new_price")
+    cafe = db.session.get(Cafe, cafe_id)
+    if cafe:
+        cafe.coffee_price = q
+        db.session.commit()
+        return jsonify(response={"success": "Successfully updated the price."}),200
+    else:
+        return jsonify(error={"Not Found": "Sorry a cafe with that id was not found in the database."}),404
+
 
 # HTTP DELETE - Delete Record
 
